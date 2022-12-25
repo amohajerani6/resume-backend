@@ -247,4 +247,4 @@ app.post("/refresh", (req, res) => {
   })
 })
 
-app.listen(process.env.PORT || 3001, console.log("server running on port 3001"))
+app.listen(80, console.log("server running on port 80"))
