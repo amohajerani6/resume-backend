@@ -129,7 +129,6 @@ app.get("/dash/:page", verify, async function (req, res) {
 app.get("/:page", async function (req, res) {
   let page = req.params.page
   var ip = req.clientIp
-  ip = "24.48.0.1" // This is temporary, until we get actual IP addresses
   request("http://ip-api.com/json/" + ip, { json: true }, (err, res, body) => {
     if (err) {
       return console.log(err)
