@@ -1,4 +1,5 @@
 const fs = require("fs")
+const { uploadFile, getFileStream, deleteFileS3 } = require("./s3")
 const express = require("express")
 var jwt = require("jsonwebtoken")
 var fileupload = require("express-fileupload")
@@ -18,6 +19,7 @@ const mongoModelTraffic = require("./mongoModelTraffic")
 app.use(express.json())
 
 const dbLink = process.env.dbLink
+
 let refreshTokens = []
 mongoose.connect(dbLink + "/resume?retryWrites=true&w=majority", {
   useNewUrlParser: true,
@@ -59,7 +61,17 @@ app.post("/create-page", verify, async function (req, res) {
     page: page,
   })
   if (!record || record.username == req.username) {
-    file.mv("./files/" + req.body.page + ".pdf")
+    const path = "./files/" + req.body.page + ".pdf"
+    file.mv(path)
+    // move the file to s3
+    await uploadFile(path, req.body.page + ".pdf")
+    // delete the file
+    fs.unlink(__dirname + "/files/" + page + ".pdf", (err) => {
+      if (err) {
+        throw err
+      }
+    })
+    // update mongodb
     await mongoModelPages.find({ page: page }).remove().exec()
     var newPage = new mongoModelPages({
       page: page,
@@ -73,19 +85,13 @@ app.post("/create-page", verify, async function (req, res) {
 })
 
 app.delete("/dash/:page", verify, async function (req, res) {
-  var username = req.username
   let page = req.params.page
   var record = await mongoModelPages.findOne({
     page: page,
   })
   if (!record || record.username == req.username) {
-    fs.unlink(__dirname + "/files/" + page + ".pdf", (err) => {
-      if (err) {
-        throw err
-      }
-
-      console.log("Delete File successfully.")
-    })
+    // remove file from S3
+    await deleteFileS3(page)
     await mongoModelPages.find({ page: page }).remove().exec()
 
     res.send({ deleted: true })
@@ -139,8 +145,10 @@ app.get("/:page", async function (req, res) {
     newTraffic.save()
     console.log(Date())
   })
-
-  res.sendFile(__dirname + "/files/" + page + ".pdf")
+  console.log("execute the S3 stuff")
+  const readStream = getFileStream(page) // Pipe the file directly to the client
+  readStream.pipe(res)
+  // res.sendFile(__dirname + "/files/" + page + ".pdf")
 })
 
 function generateToken(name, username) {
