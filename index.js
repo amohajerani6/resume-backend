@@ -12,7 +12,7 @@ const request = require("request")
 const app = express()
 app.use(fileupload())
 app.use(requestIp.mw())
-app.use(cors())
+app.use(cors({ credentials: true }))
 const mongoModelPages = require("./mongoModelPages")
 const mongoModelAccounts = require("./mongoModelAccounts")
 const mongoModelTraffic = require("./mongoModelTraffic")
@@ -181,6 +181,7 @@ app.post("/login", async function (req, res) {
     var dbAccount = await mongoModelAccounts.findOne({
       username: username,
     })
+
     if (dbAccount) {
       bcrypt.compare(password, dbAccount.password, function (err, result) {
         if (result) {
@@ -205,12 +206,17 @@ app.post("/login", async function (req, res) {
   findUser(req.body.username, req.body.password)
 })
 
-app.post("/register", function (req, res) {
-  bcrypt.hash(req.body.password, 5, function (err, hash) {
+app.post("/register", async function (req, res) {
+  const exists = await mongoModelAccounts
+    .findOne({ username: req.body.user })
+    .exec()
+  if (exists) {
+    return res.sendStatus(409)
+  }
+  bcrypt.hash(req.body.pwd, 5, function (err, hash) {
     // add to the db
     var newAccount = new mongoModelAccounts({
-      name: req.body.name,
-      username: req.body.username,
+      username: req.body.user,
       password: hash,
     })
     try {
